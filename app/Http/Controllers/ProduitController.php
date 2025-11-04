@@ -24,11 +24,6 @@ class ProduitController extends Controller
         return response()->json($produit, 201);
     }
 
-    public function show(Produit $produit)
-    {
-        return response()->json($produit);
-    }
-
     public function update(Request $request, Produit $produit)
     {
         $validated = $request->validate([
