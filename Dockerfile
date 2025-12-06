@@ -26,14 +26,16 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Copy project files
 COPY . .
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+# Install PHP dependencies (but DO NOT run artisan yet)
+RUN composer install --no-dev --optimize-autoloader --no-scripts
 
 # Laravel permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chown -R www-data:www-data storage bootstrap/cache
 
-# Expose port 80
+# Now that Composer is installed, we can safely run artisan
+RUN php artisan package:discover
+
+# Expose port
 EXPOSE 80
 
-# Start Apache
 CMD ["apache2-foreground"]
