@@ -4,16 +4,15 @@ return [
 
 
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
-
    
 
-    'allowed_origins' => ['http://localhost:3000'],['https://medic-360.netlify.app/'],
+    'allowed_origins' => ['https://medic-360.netlify.app'], // ton frontend
 
     'allowed_methods' => ['*'],
 
     'allowed_headers' => ['*'],
 
-    'supports_credentials' => true,
+    'supports_credentials' => false,
 
 
 ];
