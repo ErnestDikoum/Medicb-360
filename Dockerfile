@@ -20,22 +20,27 @@ RUN a2enmod rewrite
 # Set working directory
 WORKDIR /var/www/html
 
+# Set Apache DocumentRoot to Laravel public folder
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Copy project files
 COPY . .
 
-# Install PHP dependencies (but DO NOT run artisan yet)
+# Install PHP dependencies without running scripts yet
 RUN composer install --no-dev --optimize-autoloader --no-scripts
 
-# Laravel permissions
+# Set Laravel permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
 
-# Now that Composer is installed, we can safely run artisan
+# Run artisan package discovery
 RUN php artisan package:discover
 
-# Expose port
+# Expose port 80
 EXPOSE 80
 
+# Start Apache
 CMD ["apache2-foreground"]
