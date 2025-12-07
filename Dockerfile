@@ -1,6 +1,7 @@
+# ---------- Base image PHP avec Apache ----------
 FROM php:8.2-apache
 
-# Installer les dépendances système
+# ---------- Install system dependencies ----------
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -13,39 +14,36 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer les extensions PHP (PDO pour PostgreSQL inclus)
+# ---------- Install PHP extensions ----------
 RUN docker-php-ext-install pdo_pgsql mbstring exif pcntl bcmath gd zip
 
-# Activer mod_rewrite Apache
+# ---------- Enable Apache mod_rewrite ----------
 RUN a2enmod rewrite
 
-# Répertoire de travail
+# ---------- Set working directory ----------
 WORKDIR /var/www/html
 
-# DocumentRoot Laravel
+# ---------- Set Apache DocumentRoot to Laravel public ----------
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 
-# Installer Composer
+# ---------- Install Composer ----------
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copier le projet
+# ---------- Copy project files ----------
 COPY . .
 
-# Installer les dépendances PHP sans scripts
+# ---------- Install PHP dependencies ----------
 RUN composer install --no-dev --optimize-autoloader --no-scripts
 
-# Permissions Laravel
+# ---------- Set permissions for Laravel ----------
 RUN chown -R www-data:www-data storage bootstrap/cache
 
-# Package discovery
+# ---------- Run artisan package discovery ----------
 RUN php artisan package:discover
 
-# Migrations
-RUN php artisan migrate --force
-
-# Exposer port 80
+# ---------- Expose port 80 ----------
 EXPOSE 80
 
-# Lancer Apache
+# ---------- Entrypoint ----------
 CMD ["apache2-foreground"]
