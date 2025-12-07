@@ -39,6 +39,9 @@ RUN chown -R www-data:www-data storage bootstrap/cache
 # Run artisan package discovery
 RUN php artisan package:discover
 
+# Run migrations in production
+RUN php artisan migrate --force
+
 # Expose port 80
 EXPOSE 80
 
