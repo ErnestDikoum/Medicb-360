@@ -1,51 +1,64 @@
-FROM php:8.2-apache
+# Stage 1: Builder (Composer + dependencies)
+FROM php:8.2-cli AS builder
 
-# Install system dependencies
+# Installer les dépendances système nécessaires pour Laravel
 RUN apt-get update && apt-get install -y \
     git \
-    curl \
-    zip \
     unzip \
+    libzip-dev \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
-    libzip-dev \
-    libpq-dev
+    && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions (PostgreSQL + common Laravel)
-RUN docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip
+# Installer les extensions PHP nécessaires
+RUN docker-php-ext-install pdo_pgsql pdo_mysql mbstring exif pcntl bcmath gd zip
 
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
-
-# Set working directory
-WORKDIR /var/www/html
-
-# Set Apache DocumentRoot to Laravel public folder
-ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-
-# Install Composer
+# Installer Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy project
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier uniquement le fichier composer.json et composer.lock pour le cache
+COPY composer.json composer.lock ./
+
+# Installer les dépendances PHP
+RUN composer install --no-dev --optimize-autoloader
+
+# Copier le reste du projet
 COPY . .
 
-# Install dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# Stage 2: Production image
+FROM php:8.2-apache
 
-# Fix permissions
-RUN chown -R www-data:www-data storage bootstrap/cache
+# Installer les extensions nécessaires (peut être réduit selon besoin)
+RUN apt-get update && apt-get install -y \
+    libpng-dev \
+    libzip-dev \
+    libonig-dev \
+    libxml2-dev \
+    && docker-php-ext-install pdo_pgsql pdo_mysql mbstring exif pcntl bcmath gd zip \
+    && a2enmod rewrite \
+    && rm -rf /var/lib/apt/lists/*
 
-# Run package discovery
-RUN php artisan package:discover
+# Définir le DocumentRoot sur le dossier public de Laravel
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 
-# DO NOT run migrations during build (Render blocks DB connections at build time)
-# Migrations will run when the container starts
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Copier uniquement le code + vendor depuis le builder
+COPY --from=builder /app /var/www/html
 
+# Permissions Laravel
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Artisan optimizations
+RUN php /var/www/html/artisan config:cache
+RUN php /var/www/html/artisan route:cache
+RUN php /var/www/html/artisan view:cache
+
+# Exposer le port
 EXPOSE 80
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+# Lancer Apache
 CMD ["apache2-foreground"]
